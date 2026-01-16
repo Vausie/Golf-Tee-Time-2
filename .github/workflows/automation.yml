@@ -1,0 +1,39 @@
+
+name: Weekly CCJ Golf Booking
+
+on:
+  schedule:
+    - cron: '0 4 * * 4' # Thursdays 4:00 UTC = 6:00 AM SAST
+  workflow_dispatch: {} # This enables the "Run workflow" button in the Actions tab
+
+jobs:
+  book_golf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install playwright
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run Automation Agent
+        env:
+          CCJ_USER: ${{ secrets.CCJ_USER }}
+          CCJ_PASS: ${{ secrets.CCJ_PASS }}
+        run: node booking-agent.js
+
+      - name: Commit and Push Logs
+        run: |
+          git config --global user.name 'CCJ-Bot'
+          git config --global user.email 'bot@syndev.co.za'
+          git add logs.json
+          git commit -m "Update booking logs [skip ci]" || echo "No changes to commit"
+          git push
