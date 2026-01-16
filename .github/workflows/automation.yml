@@ -1,10 +1,12 @@
-
 name: Weekly CCJ Golf Booking
 
 on:
   schedule:
     - cron: '0 4 * * 4' # Thursdays 4:00 UTC = 6:00 AM SAST
-  workflow_dispatch: {} # This enables the "Run workflow" button in the Actions tab
+  workflow_dispatch: {} # Manual trigger
+
+permissions:
+  contents: write # REQUIRED to push logs.json back to the repo
 
 jobs:
   book_golf:
