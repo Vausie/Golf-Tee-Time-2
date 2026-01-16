@@ -28,13 +28,11 @@
         }
     </style>
 
-    <!-- Polyfill for process and global for libraries that expect Node-like env -->
     <script>
       window.process = { env: { NODE_ENV: 'production' } };
       window.global = window;
     </script>
 
-    <!-- es-module-shims ensures importmap works reliably -->
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.10.0/dist/es-module-shims.js"></script>
 
     <script type="importmap">
@@ -43,8 +41,8 @@
     "react": "https://esm.sh/react@19.0.0",
     "react-dom": "https://esm.sh/react-dom@19.0.0",
     "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "lucide-react": "https://esm.sh/lucide-react@0.460.0?deps=react@19.0.0",
-    "recharts": "https://esm.sh/recharts@2.13.0?deps=react@19.0.0,react-dom@19.0.0",
+    "lucide-react": "https://esm.sh/lucide-react@0.475.0?deps=react@19.0.0",
+    "recharts": "https://esm.sh/recharts@2.15.0?deps=react@19.0.0,react-dom@19.0.0",
     "clsx": "https://esm.sh/clsx@2.1.1",
     "tailwind-merge": "https://esm.sh/tailwind-merge@2.5.2",
     "@google/genai": "https://esm.sh/@google/genai@1.36.0",
@@ -53,11 +51,9 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body>
     <div id="root"></div>
     <script type="module" src="index.tsx"></script>
-<script type="module" src="/index.tsx"></script>
 </body>
 </html>
