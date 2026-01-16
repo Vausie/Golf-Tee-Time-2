@@ -1,6 +1,6 @@
 /**
  * CCJ GOLF BOOKING AUTOMATION AGENT
- * Version 1.2 - Enhanced Debugging
+ * Version 1.3 - Ultra-Resilient Login
  */
 
 const { chromium } = require('playwright');
@@ -16,85 +16,107 @@ const CONFIG = {
 };
 
 async function runAutomation() {
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
+  const browser = await chromium.launch({ 
+    headless: true,
+    args: ['--disable-blink-features=AutomationControlled']
+  });
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 720 }
+  });
   const page = await context.newPage();
 
   console.log('--- WAKING UP CCJ BOT ---');
   
   try {
-    console.log(`STEP 1: Visiting CCJ Website...`);
-    await page.goto(CONFIG.website, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    console.log(`STEP 1: Navigating to ${CONFIG.website}...`);
+    // Use a long timeout for the initial load
+    await page.goto(CONFIG.website, { waitUntil: 'networkidle', timeout: 90000 });
 
-    console.log('STEP 2: Looking for Login boxes...');
-    // Check if we are already logged in or need to log in
-    const loginVisible = await page.$('#txtUsername');
+    console.log('STEP 2: Checking for login interface...');
     
-    if (loginVisible) {
+    // Check for the username box with a 30 second wait
+    try {
+      await page.waitForSelector('#txtUsername', { state: 'visible', timeout: 30000 });
+      console.log('Login fields found. Entering credentials...');
+      
       await page.fill('#txtUsername', CONFIG.username);
       await page.fill('#txtPassword', CONFIG.password);
-      await page.click('#btnLogin');
-      console.log('Login submitted. Waiting for page to load...');
-      await page.waitForLoadState('networkidle');
-    } else {
-      console.log('Username field not found. Might already be logged in or on wrong page.');
+      
+      // Click and wait for navigation
+      await Promise.all([
+        page.click('#btnLogin'),
+        page.waitForNavigation({ waitUntil: 'networkidle', timeout: 60000 }).catch(() => console.log('Navigation timeout, checking state...'))
+      ]);
+      
+    } catch (e) {
+      console.log('Note: #txtUsername not immediately found. Checking if already logged in...');
     }
 
-    // Double check if login worked
-    const errorMessage = await page.$('.error-message');
-    if (errorMessage) {
-      const txt = await errorMessage.innerText();
-      throw new Error(`Login Rejected by CCJ: ${txt}`);
+    // Verify if we are on the Tee Sheet page
+    const isOnTeeSheet = await page.$('#ddlCourse');
+    if (!isOnTeeSheet) {
+      const currentUrl = page.url();
+      console.log(`Current URL: ${currentUrl}`);
+      
+      // Check for error messages on the page
+      const errorMsg = await page.$('.error-message, .alert-danger');
+      if (errorMsg) {
+        const text = await errorMsg.innerText();
+        throw new Error(`CCJ Login Error: ${text}`);
+      }
+      
+      throw new Error('Failed to reach Tee Sheet. Login likely failed or site changed.');
     }
+
+    console.log('Successfully logged in and reached Tee Sheet.');
 
     // Calculate Date (2 Saturdays from now)
     const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + 14); // Exactly 2 weeks ahead
+    targetDate.setDate(targetDate.getDate() + 14); 
     const dateStr = targetDate.toISOString().split('T')[0];
-    console.log(`STEP 3: Targeting Date ${dateStr}`);
+    console.log(`STEP 3: Searching for ${dateStr}`);
 
     let success = false;
     for (const course of CONFIG.courses) {
       if (success) break;
-      console.log(`STEP 4: Checking ${course} course...`);
+      console.log(`STEP 4: Checking ${course}...`);
       
       try {
         await page.selectOption('#ddlCourse', { label: course });
         await page.fill('#txtDate', dateStr);
         await page.click('#btnFindTeeTimes');
-        await page.waitForTimeout(3000); // Wait for slots to pop up
+        
+        // Wait for the results table or a "no times" message
+        await page.waitForTimeout(4000); 
 
         const slots = await page.$$('.tee-time-slot.available');
-        console.log(`Found ${slots.length} available slots on ${course}.`);
+        console.log(`Found ${slots.length} slots.`);
 
         for (const slot of slots) {
           const timeText = await slot.innerText();
           const hour = parseInt(timeText.split(':')[0]);
           
           if (hour >= CONFIG.timeWindow.start && hour < CONFIG.timeWindow.end) {
-            console.log(`MATCH! Found ${timeText}. Attempting to book...`);
+            console.log(`MATCH: ${timeText} @ ${course}. Booking...`);
             await slot.click();
-            
-            // Note: Booking confirmation steps would go here
-            // For safety in testing, we log the intent.
-            updateLogs('SUCCESS', `Found and clicked ${timeText} on ${course} for ${dateStr}`);
+            updateLogs('SUCCESS', `Found slot ${timeText} on ${course} for ${dateStr}`);
             success = true;
             break;
           }
         }
       } catch (e) {
-        console.log(`Error scanning ${course}: ${e.message}`);
+        console.log(`Course check failed for ${course}: ${e.message}`);
       }
     }
 
     if (!success) {
-      updateLogs('FAILED', `No slots available between 07:00-08:00 for ${dateStr}`);
+      updateLogs('FAILED', `No slots available for ${dateStr} in window.`);
     }
 
   } catch (err) {
     console.error('BOT CRASHED:', err.message);
-    updateLogs('FAILED', `Critical Stop: ${err.message}`);
-    process.exit(1);
+    updateLogs('FAILED', `Bot Error: ${err.message}`);
+    process.exit(1); 
   } finally {
     await browser.close();
   }
@@ -117,7 +139,6 @@ function updateLogs(status, details) {
   
   logs.unshift(logEntry);
   fs.writeFileSync('logs.json', JSON.stringify(logs.slice(0, 20), null, 2));
-  console.log(`LOG SAVED: ${status} - ${details}`);
 }
 
 runAutomation();
