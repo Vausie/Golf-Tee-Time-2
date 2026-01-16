@@ -21,7 +21,8 @@ jobs:
           node-version: '20'
 
       - name: Install Dependencies
-        run: npm install playwright
+        # Using --legacy-peer-deps to ignore conflicts between React 19 and older peer dependencies
+        run: npm install playwright --legacy-peer-deps
 
       - name: Install Playwright Browsers
         run: npx playwright install chromium --with-deps
